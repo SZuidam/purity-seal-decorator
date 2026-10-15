@@ -213,6 +213,12 @@ button.link {
   margin-bottom: 6px;
 }
 
+.warning {
+  margin: 0 0 6px;
+  color: #b71c1c;
+  font-size: 12px;
+}
+
 .muted {
   color: var(--muted);
 }

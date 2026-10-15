@@ -1,5 +1,6 @@
+import { round2 } from '../utils/geometry';
 import { newId } from '../utils/id';
-import type { Doc, ImageElement, SealDesign, SealElement, SealInstance, TextElement } from './types';
+import { LINE_HEIGHT, type Doc, type ImageElement, type SealDesign, type SealElement, type SealInstance, type TextElement } from './types';
 
 export const DEFAULT_SEAL_WIDTH = 30;
 export const DEFAULT_SEAL_HEIGHT = 80;
@@ -20,15 +21,19 @@ export function createInstance(designId: string, x: number, y: number, rotation 
 }
 
 export function createText(design: SealDesign, partial: Partial<TextElement> = {}): TextElement {
+  const fontSizeMm = partial.fontSizeMm ?? 6;
   return {
     id: newId('text'),
     type: 'text',
     x: design.widthMm / 2,
     y: design.heightMm / 2,
     rotation: 0,
+    width: round2(design.widthMm * 0.8),
+    // Room for two lines.
+    height: round2(fontSizeMm * LINE_HEIGHT * 2),
     text: 'Purity',
     fontFamily: 'UnifrakturMaguntia',
-    fontSizeMm: 6,
+    fontSizeMm,
     color: '#5a0f0f',
     bold: false,
     italic: false,

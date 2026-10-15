@@ -21,7 +21,8 @@ export function parseDoc(json: string): Doc {
   }
   if (!data || typeof data !== 'object') throw new ImportError('The file does not contain a seal document.');
   const file = data as Partial<DocFile>;
-  if (file.version !== DOC_VERSION) {
+  if ((file.version as number) === 1) migrateV1(file);
+  else if (file.version !== DOC_VERSION) {
     throw new ImportError(`Unsupported file version ${String(file.version)} (expected ${DOC_VERSION}).`);
   }
   if (!file.page || !file.designs || !Array.isArray(file.instances) || !file.assets) {
@@ -31,6 +32,21 @@ export function parseDoc(json: string): Doc {
     if (!file.designs[inst.designId]) throw new ImportError(`Seal ${inst.id} references a missing design.`);
   }
   return { page: file.page, designs: file.designs, instances: file.instances, assets: file.assets };
+}
+
+/**
+ * v1 text had no box and never wrapped. Give it a box the size of its seal: the seal
+ * already clipped anything beyond that, so wrapping there keeps old seals readable.
+ */
+function migrateV1(file: Partial<DocFile>) {
+  for (const design of Object.values(file.designs ?? {})) {
+    for (const el of design.elements) {
+      if (el.type === 'text' && el.width === undefined) {
+        el.width = design.widthMm;
+        el.height = design.heightMm;
+      }
+    }
+  }
 }
 
 /** Restore the last autosaved document, then keep saving changes. Returns an unsubscribe function. */

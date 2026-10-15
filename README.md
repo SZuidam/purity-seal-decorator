@@ -18,7 +18,8 @@ npm run build    # type-check + production build into dist/
 3. **Double-click** a seal (or press Enter) to edit its content. Then you can:
    - **Add text**: pick a font (bundled gothic fonts, or system fonts), size, colour, bold/italic and alignment. Multi-line text works.
    - **Add image**: use the button, drag a file onto the seal, or paste an image from the clipboard (Ctrl+V).
-   - Drag elements to move them. Use the round handle to rotate and the square corner handle to resize (images: Shift keeps the aspect ratio; text: scales the font size).
+   - Drag elements to move them. Use the round handle to rotate and the square handles on the corners and edges to resize; the opposite side stays in place (images: Shift on a corner keeps the aspect ratio).
+   - Text sits in a **text box**: resizing the box (handles, or Width/Height in the panel) re-wraps the text while the font size stays the same. If the text doesn't fit, the box outline turns red and the overflow is cut off; **Fit height to text** sizes the box to the wrapped lines.
    - Press Esc to finish editing.
 4. Set the seal's **template size** (cut outline width/height in mm), outline colour/width/dashing and an optional background in the properties panel.
 

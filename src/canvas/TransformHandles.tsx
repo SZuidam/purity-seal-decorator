@@ -1,12 +1,16 @@
+import { useMemo } from 'react';
 import type React from 'react';
 import type { SealDesign, SealElement, SealInstance } from '../model/types';
 import { useDocStore } from '../store/docStore';
 import { angleFromUp, normalizeAngle, rotateVec, round2, snapAngle } from '../utils/geometry';
 import { sealTransform } from './SealView';
-import { elementNodeId, pagePoint, sealPoint, startPointerDrag, useMeasuredBox, type Box } from './useDragTransform';
+import { layoutText } from '../utils/textLayout';
+import { useFontsVersion } from './ElementView';
+import { pagePoint, sealPoint, startPointerDrag } from './useDragTransform';
 
 const SELECT_COLOR = '#1e88e5';
 const EDIT_COLOR = '#f57c00';
+const OVERFLOW_COLOR = '#d32f2f';
 const ROTATE_SNAP_DEG = 15;
 
 interface SealOverlayProps {
@@ -91,6 +95,19 @@ function RotateHandle({
   );
 }
 
+/** Resize handle positions as unit offsets from the box centre: corners and edge midpoints. */
+const RESIZE_HANDLES: { hx: -1 | 0 | 1; hy: -1 | 0 | 1; cursor: string }[] = [
+  { hx: -1, hy: -1, cursor: 'nwse-resize' },
+  { hx: 0, hy: -1, cursor: 'ns-resize' },
+  { hx: 1, hy: -1, cursor: 'nesw-resize' },
+  { hx: 1, hy: 0, cursor: 'ew-resize' },
+  { hx: 1, hy: 1, cursor: 'nwse-resize' },
+  { hx: 0, hy: 1, cursor: 'ns-resize' },
+  { hx: -1, hy: 1, cursor: 'nesw-resize' },
+  { hx: -1, hy: 0, cursor: 'ew-resize' },
+];
+const MIN_SIZE_MM = 1;
+
 function ElementOverlay({
   instanceId,
   designId,
@@ -102,12 +119,12 @@ function ElementOverlay({
   element: SealElement;
   ui: number;
 }) {
-  const textBox = useMeasuredBox(elementNodeId(instanceId, element.id));
-  const box: Box =
-    element.type === 'image'
-      ? { x: -element.width / 2, y: -element.height / 2, width: element.width, height: element.height }
-      : textBox;
+  const fontsVersion = useFontsVersion();
+  // fontsVersion: re-measure once web fonts arrive.
+  const overflows = useMemo(() => element.type === 'text' && layoutText(element).overflows, [element, fontsVersion]);
+  const { width: w, height: h } = element;
   const pad = 1.5 * ui;
+  const color = overflows ? OVERFLOW_COLOR : SELECT_COLOR;
   const update = (patch: Partial<SealElement>) => useDocStore.getState().updateElement(designId, element.id, patch);
 
   /** Pointer in the element's own (rotated) frame, origin at its centre. */
@@ -124,59 +141,68 @@ function ElementOverlay({
     });
   };
 
-  const onResizeDown = (e: React.PointerEvent) => {
-    if (element.type === 'image') {
-      const { width: w0, height: h0 } = element;
-      startPointerDrag(e, (ev) => {
-        const l = localPoint(ev);
-        let width = Math.max(1, 2 * Math.abs(l.x));
-        let height = Math.max(1, 2 * Math.abs(l.y));
-        if (ev.shiftKey) {
-          const s = Math.max(width / w0, height / h0);
-          width = w0 * s;
-          height = h0 * s;
-        }
-        update({ width: round2(width), height: round2(height) });
-      });
-    } else {
-      // Scale the font size by how far the corner is dragged from the centre.
-      const fs0 = element.fontSizeMm;
-      const corner = { x: box.x + box.width, y: box.y + box.height };
-      const d0 = Math.hypot(corner.x, corner.y) || 1;
-      startPointerDrag(e, (ev) => {
-        const l = localPoint(ev);
-        const d = Math.hypot(l.x, l.y);
-        update({ fontSizeMm: Math.max(0.5, round2((fs0 * d) / d0)) });
-      });
-    }
+  /**
+   * Resize from one handle while the opposite side stays put. Text keeps its font size
+   * and re-wraps; on corner handles Shift keeps the aspect ratio.
+   */
+  const onResizeDown = (e: React.PointerEvent, hx: number, hy: number) => {
+    const anchor = { x: (-hx * w) / 2, y: (-hy * h) / 2 };
+    startPointerDrag(e, (ev) => {
+      const l = localPoint(ev);
+      let width = hx ? Math.max(MIN_SIZE_MM, hx * (l.x - anchor.x)) : w;
+      let height = hy ? Math.max(MIN_SIZE_MM, hy * (l.y - anchor.y)) : h;
+      if (ev.shiftKey && hx && hy) {
+        const s = Math.max(width / w, height / h);
+        width = w * s;
+        height = h * s;
+      }
+      const centre = rotateVec(
+        { x: hx ? anchor.x + (hx * width) / 2 : 0, y: hy ? anchor.y + (hy * height) / 2 : 0 },
+        element.rotation,
+      );
+      update({ width: round2(width), height: round2(height), x: element.x + centre.x, y: element.y + centre.y });
+    });
   };
 
+  const hs = 7 * ui;
   return (
     <g transform={`translate(${element.x} ${element.y}) rotate(${element.rotation})`}>
       <rect
-        x={box.x - pad}
-        y={box.y - pad}
-        width={box.width + 2 * pad}
-        height={box.height + 2 * pad}
+        x={-w / 2 - pad}
+        y={-h / 2 - pad}
+        width={w + 2 * pad}
+        height={h + 2 * pad}
         fill="none"
-        stroke={SELECT_COLOR}
+        stroke={color}
         strokeWidth={1.2 * ui}
+        strokeDasharray={overflows ? `${4 * ui} ${2 * ui}` : undefined}
         pointerEvents="none"
-      />
-      <RotateHandle cx={box.x + box.width / 2} top={box.y - pad} ui={ui} color={SELECT_COLOR} onPointerDown={onRotateDown} />
-      <rect
-        x={box.x + box.width + pad - 4 * ui}
-        y={box.y + box.height + pad - 4 * ui}
-        width={8 * ui}
-        height={8 * ui}
-        fill="white"
-        stroke={SELECT_COLOR}
-        strokeWidth={1.5 * ui}
-        style={{ cursor: 'nwse-resize' }}
-        onPointerDown={onResizeDown}
       >
-        <title>{element.type === 'image' ? 'Resize (Shift keeps aspect ratio)' : 'Scale text'}</title>
+        {overflows && <title>The text doesn't fit: make the box taller or the font smaller</title>}
       </rect>
+      <RotateHandle cx={0} top={-h / 2 - pad} ui={ui} color={color} onPointerDown={onRotateDown} />
+      {RESIZE_HANDLES.map(({ hx, hy, cursor }) => (
+        <rect
+          key={`${hx},${hy}`}
+          x={hx * (w / 2 + pad) - hs / 2}
+          y={hy * (h / 2 + pad) - hs / 2}
+          width={hs}
+          height={hs}
+          fill="white"
+          stroke={color}
+          strokeWidth={1.5 * ui}
+          style={{ cursor }}
+          onPointerDown={(e) => onResizeDown(e, hx, hy)}
+        >
+          <title>
+            {element.type === 'text'
+              ? 'Resize the text box (text re-wraps, font size stays)'
+              : hx && hy
+                ? 'Resize (Shift keeps aspect ratio)'
+                : 'Resize'}
+          </title>
+        </rect>
+      ))}
     </g>
   );
 }

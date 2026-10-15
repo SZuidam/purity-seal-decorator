@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFontsVersion } from '../canvas/ElementView';
 import { linkedCount } from '../model/ops';
 import type { ImageElement, SealDesign, SealElement, SealInstance, TextAlign, TextElement } from '../model/types';
 import { addImageFile, addText, duplicateSelected, unlinkSelected } from '../store/actions';
@@ -7,6 +8,7 @@ import { useUiStore } from '../store/uiStore';
 import { linkColor } from '../utils/color';
 import { round2 } from '../utils/geometry';
 import { loadImageFile } from '../utils/image';
+import { layoutText } from '../utils/textLayout';
 import { FONTS } from './fonts';
 
 export function PropertiesPanel() {
@@ -190,6 +192,9 @@ function ElementSection({ design, element }: { design: SealDesign; element: Seal
 
 function TextFields({ el, update }: { el: TextElement; update: (p: Partial<TextElement>) => void }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const fontsVersion = useFontsVersion();
+  // fontsVersion: re-measure once web fonts arrive.
+  const layout = useMemo(() => layoutText(el), [el, fontsVersion]);
   const focusTextId = useUiStore((s) => s.focusTextId);
   // Focus the text box for newly added text, so typing replaces the placeholder.
   useEffect(() => {
@@ -236,6 +241,20 @@ function TextFields({ el, update }: { el: TextElement; update: (p: Partial<TextE
             {{ start: 'Left', middle: 'Centre', end: 'Right' }[a]}
           </button>
         ))}
+      </div>
+      <h3>Text box</h3>
+      <div className="grid2">
+        <NumberField label="Width (mm)" value={round2(el.width)} min={1} step={0.5} onChange={(width) => update({ width })} />
+        <NumberField label="Height (mm)" value={round2(el.height)} min={1} step={0.5} onChange={(height) => update({ height })} />
+      </div>
+      {layout.overflows && <p className="warning">The text doesn't fit in the box and is cut off.</p>}
+      <div className="row">
+        <button
+          onClick={() => update({ height: round2(layout.lines.length * layout.lineHeight) })}
+          title="Set the box height to exactly fit the wrapped lines"
+        >
+          Fit height to text
+        </button>
       </div>
     </>
   );

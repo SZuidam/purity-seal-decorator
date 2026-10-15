@@ -1,4 +1,3 @@
-import { useLayoutEffect, useState } from 'react';
 import type React from 'react';
 import { beginGesture } from '../store/docStore';
 import { clientToSvg, type Point } from '../utils/geometry';
@@ -47,39 +46,4 @@ export function pagePoint(ev: { clientX: number; clientY: number }): Point {
 export function sealPoint(instanceId: string, ev: { clientX: number; clientY: number }): Point {
   const g = document.getElementById(sealGroupId(instanceId)) as SVGGElement | null;
   return g ? clientToSvg(g, ev.clientX, ev.clientY) : { x: 0, y: 0 };
-}
-
-export interface Box {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-const EMPTY_BOX: Box = { x: 0, y: 0, width: 0, height: 0 };
-
-/** Measure an SVG node's local bounding box; re-measures after every render and when fonts finish loading. */
-export function useMeasuredBox(nodeId: string): Box {
-  const [box, setBox] = useState<Box>(EMPTY_BOX);
-  useLayoutEffect(() => {
-    const node = document.getElementById(nodeId) as SVGGraphicsElement | null;
-    if (!node) return;
-    const b = node.getBBox();
-    if (b.x !== box.x || b.y !== box.y || b.width !== box.width || b.height !== box.height) {
-      setBox({ x: b.x, y: b.y, width: b.width, height: b.height });
-    }
-  });
-  useLayoutEffect(() => {
-    if (!document.fonts) return;
-    const remeasure = () => {
-      const node = document.getElementById(nodeId) as SVGGraphicsElement | null;
-      if (!node) return;
-      const b = node.getBBox();
-      setBox({ x: b.x, y: b.y, width: b.width, height: b.height });
-    };
-    document.fonts.addEventListener('loadingdone', remeasure);
-    document.fonts.ready.then(remeasure);
-    return () => document.fonts.removeEventListener('loadingdone', remeasure);
-  }, [nodeId]);
-  return box;
 }

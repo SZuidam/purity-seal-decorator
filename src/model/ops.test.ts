@@ -121,10 +121,20 @@ describe('JSON export/import', () => {
     expect(parseDoc(serializeDoc(r.doc))).toEqual(r.doc);
   });
 
+  it('migrates v1 text elements to a seal-sized text box', () => {
+    const { doc, designId } = docWithSeal();
+    const v1 = JSON.parse(serializeDoc(doc));
+    v1.version = 1;
+    delete v1.designs[designId].elements[0].width;
+    delete v1.designs[designId].elements[0].height;
+    const migrated = parseDoc(JSON.stringify(v1));
+    expect(migrated.designs[designId].elements[0]).toMatchObject({ width: 30, height: 80 });
+  });
+
   it('rejects unknown versions and broken references', () => {
     expect(() => parseDoc('{"version":99}')).toThrow(/version/);
     expect(() => parseDoc('not json')).toThrow(/JSON/);
-    const bad = { version: 1, page: {}, designs: {}, assets: {}, instances: [{ id: 's', designId: 'missing' }] };
+    const bad = { version: 2, page: {}, designs: {}, assets: {}, instances: [{ id: 's', designId: 'missing' }] };
     expect(() => parseDoc(JSON.stringify(bad))).toThrow(/missing design/);
   });
 });

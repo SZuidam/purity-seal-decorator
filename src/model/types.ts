@@ -1,14 +1,20 @@
 // All lengths are millimetres, all angles are degrees.
 
+/** Line spacing as a multiple of the font size. */
+export const LINE_HEIGHT = 1.15;
+
 export type TextAlign = 'start' | 'middle' | 'end';
 
 export interface TextElement {
   id: string;
   type: 'text';
-  /** Centre of the element, relative to the seal's top-left corner. */
+  /** Centre of the text box, relative to the seal's top-left corner. */
   x: number;
   y: number;
   rotation: number;
+  /** Text box size; text wraps at the width and is clipped at the height. */
+  width: number;
+  height: number;
   text: string;
   fontFamily: string;
   fontSizeMm: number;
@@ -79,7 +85,8 @@ export interface Doc {
   assets: Record<string, Asset>;
 }
 
-export const DOC_VERSION = 1;
+/** v2: text elements gained width/height (wrapping text boxes). */
+export const DOC_VERSION = 2;
 
 export interface DocFile extends Doc {
   version: typeof DOC_VERSION;
