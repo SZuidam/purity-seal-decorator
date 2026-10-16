@@ -3,8 +3,6 @@ import { useStore } from 'zustand';
 import { linkedCount } from '../model/ops';
 import type { Orientation, PageSize } from '../model/types';
 import {
-  addImageFile,
-  addText,
   copySelected,
   deleteSelection,
   newSeal,
@@ -25,7 +23,6 @@ export function Toolbar() {
   const canUndo = useStore(useDocStore.temporal, (s) => s.pastStates.length > 0);
   const canRedo = useStore(useDocStore.temporal, (s) => s.futureStates.length > 0);
   const { selectedInstanceId, clipboard, zoom, setZoom, clearSelection } = useUiStore();
-  const imageInput = useRef<HTMLInputElement>(null);
   const jsonInput = useRef<HTMLInputElement>(null);
 
   const selected = doc.instances.find((i) => i.id === selectedInstanceId);
@@ -49,21 +46,6 @@ export function Toolbar() {
       </div>
       <div className="group">
         <button onClick={() => newSeal()} title="Add a new blank seal">New seal</button>
-        <button onClick={() => addText()} title="Add text to the selected seal">Add text</button>
-        <button onClick={() => imageInput.current?.click()} title="Add an image (or drop / paste one onto a seal)">
-          Add image
-        </button>
-        <input
-          ref={imageInput}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void addImageFile(file);
-            e.target.value = '';
-          }}
-        />
       </div>
       <div className="group">
         <button
