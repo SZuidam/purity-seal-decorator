@@ -139,6 +139,60 @@ button.link {
   border-left: 1px solid var(--border);
 }
 
+.panel-split {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.panel-split .pane {
+  overflow-y: auto;
+  padding: 12px 14px;
+  min-height: 0;
+}
+
+.panel-split .pane-top {
+  flex: 0 0 50%;
+}
+
+.panel-split .pane-bottom {
+  flex: 1 1 0;
+}
+
+.splitter {
+  flex: 0 0 8px;
+  position: relative;
+  cursor: row-resize;
+  background: var(--border);
+  touch-action: none;
+  outline: none;
+}
+
+.splitter::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 32px;
+  height: 2px;
+  transform: translate(-50%, -50%);
+  border-radius: 1px;
+  background: var(--muted);
+}
+
+.splitter:hover,
+.splitter:focus-visible,
+.splitter:active {
+  background: var(--accent);
+}
+
+.splitter:hover::after,
+.splitter:focus-visible::after,
+.splitter:active::after {
+  background: #fff;
+}
+
 .panel h2 {
   margin: 0 0 8px;
   font-family: 'Cinzel', serif;
@@ -234,6 +288,15 @@ button.link {
 .element-list {
   margin: 4px 0;
   padding-left: 18px;
+}
+
+.element-list li.active::marker {
+  color: var(--accent);
+}
+
+.element-list li.active button {
+  font-weight: 600;
+  text-decoration: underline;
 }
 
 .shortcuts {

@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useFontsVersion } from '../canvas/ElementView';
 import { linkedCount } from '../model/ops';
 import type { ImageElement, SealDesign, SealElement, SealInstance, TextAlign, TextElement } from '../model/types';
 import { addImageFile, addText, duplicateSelected, unlinkSelected } from '../store/actions';
 import { useDocStore } from '../store/docStore';
-import { useUiStore } from '../store/uiStore';
+import { SPLIT_MAX, SPLIT_MIN, useUiStore } from '../store/uiStore';
 import { linkColor } from '../utils/color';
 import { round2 } from '../utils/geometry';
 import { loadImageFile } from '../utils/image';
@@ -13,7 +13,8 @@ import { FONTS } from './fonts';
 
 export function PropertiesPanel() {
   const doc = useDocStore((s) => s.doc);
-  const { selectedInstanceId, editingInstanceId, selectedElementId } = useUiStore();
+  const { selectedInstanceId, editingInstanceId, selectedElementId, inspectorSplit: split } = useUiStore();
+  const panelRef = useRef<HTMLElement>(null);
   const instance = doc.instances.find((i) => i.id === selectedInstanceId);
   const design = instance ? doc.designs[instance.designId] : undefined;
 
@@ -31,14 +32,74 @@ export function PropertiesPanel() {
   const element = editing ? design.elements.find((e) => e.id === selectedElementId) : undefined;
 
   return (
-    <aside className="panel">
-      {element ? (
-        <ElementSection design={design} element={element} />
-      ) : (
-        <SealSection instance={instance} design={design} links={linkedCount(doc, design.id)} editing={editing} />
-      )}
-      <Shortcuts />
+    <aside className="panel panel-split" ref={panelRef}>
+      <section className="pane pane-top" style={{ flexBasis: `${split * 100}%` }}>
+        <SealSection
+          instance={instance}
+          design={design}
+          links={linkedCount(doc, design.id)}
+          editing={editing}
+          selectedElementId={element?.id ?? null}
+        />
+        <Shortcuts />
+      </section>
+      <Splitter panelRef={panelRef} />
+      <section className="pane pane-bottom">
+        {element ? <ElementSection design={design} element={element} /> : <ElementPlaceholder editing={editing} />}
+      </section>
     </aside>
+  );
+}
+
+/** Draggable divider between the seal pane and the element pane. */
+function Splitter({ panelRef }: { panelRef: RefObject<HTMLElement | null> }) {
+  const split = useUiStore((s) => s.inspectorSplit);
+  const { setInspectorSplit } = useUiStore.getState();
+  const dragging = useRef(false);
+
+  return (
+    <div
+      className="splitter"
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Resize seal and element panes"
+      aria-valuemin={SPLIT_MIN * 100}
+      aria-valuemax={SPLIT_MAX * 100}
+      aria-valuenow={Math.round(split * 100)}
+      tabIndex={0}
+      title="Drag to resize (double-click to reset)"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        dragging.current = true;
+      }}
+      onPointerMove={(e) => {
+        const panel = panelRef.current;
+        if (!dragging.current || !panel) return;
+        const rect = panel.getBoundingClientRect();
+        setInspectorSplit((e.clientY - rect.top) / rect.height);
+      }}
+      onPointerUp={() => (dragging.current = false)}
+      onPointerCancel={() => (dragging.current = false)}
+      onDoubleClick={() => setInspectorSplit(0.5)}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          e.stopPropagation();
+          setInspectorSplit(split + (e.key === 'ArrowUp' ? -0.05 : 0.05));
+        }
+      }}
+    />
+  );
+}
+
+function ElementPlaceholder({ editing }: { editing: boolean }) {
+  return (
+    <p className="muted">
+      {editing
+        ? 'Click a text or image on the seal, or pick one from the Content list.'
+        : 'Double-click the seal (or pick an item from Content) to edit an element.'}
+    </p>
   );
 }
 
@@ -47,11 +108,13 @@ function SealSection({
   design,
   links,
   editing,
+  selectedElementId,
 }: {
   instance: SealInstance;
   design: SealDesign;
   links: number;
   editing: boolean;
+  selectedElementId: string | null;
 }) {
   const { updateDesign, updateInstance, bringToFront } = useDocStore.getState();
   const { enterEdit, exitEdit, selectElement } = useUiStore.getState();
@@ -131,9 +194,10 @@ function SealSection({
       {design.elements.length > 0 && (
         <ul className="element-list">
           {[...design.elements].reverse().map((el) => (
-            <li key={el.id}>
+            <li key={el.id} className={el.id === selectedElementId ? 'active' : undefined}>
               <button
                 className="link"
+                aria-current={el.id === selectedElementId ? 'true' : undefined}
                 onClick={() => {
                   enterEdit(instance.id);
                   selectElement(el.id);
@@ -158,7 +222,7 @@ function ElementSection({ design, element }: { design: SealDesign; element: Seal
     <>
       <h2>{element.type === 'text' ? 'Text' : 'Image'}</h2>
       <div className="row">
-        <button onClick={() => selectElement(null)}>← Seal</button>
+        <button onClick={() => selectElement(null)}>Deselect</button>
         <button onClick={() => reorderElement(design.id, element.id, 1)}>Forward</button>
         <button onClick={() => reorderElement(design.id, element.id, -1)}>Backward</button>
         <button

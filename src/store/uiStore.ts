@@ -3,6 +3,21 @@ import type { ClipboardEntry } from '../model/ops';
 
 export const PASTE_OFFSET_MM = 5;
 
+const SPLIT_KEY = 'psd.inspectorSplit';
+export const SPLIT_MIN = 0.15;
+export const SPLIT_MAX = 0.85;
+
+const clampSplit = (v: number) => Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, v));
+
+function loadSplit(): number {
+  try {
+    const v = parseFloat(localStorage.getItem(SPLIT_KEY) ?? '');
+    return Number.isFinite(v) ? clampSplit(v) : 0.5;
+  } catch {
+    return 0.5;
+  }
+}
+
 interface Clipboard {
   entry: ClipboardEntry;
   /** Whether Left Shift was held while copying. */
@@ -20,6 +35,9 @@ interface UiState {
   clipboard: Clipboard | null;
   /** Text element whose content box should grab focus once shown (set when text is added). */
   focusTextId: string | null;
+  /** Fraction of the inspector height given to the seal pane (view preference, persisted per browser). */
+  inspectorSplit: number;
+  setInspectorSplit: (v: number) => void;
   setFocusText: (id: string | null) => void;
   selectInstance: (id: string | null) => void;
   enterEdit: (instanceId: string) => void;
@@ -39,6 +57,16 @@ export const useUiStore = create<UiState>()((set, get) => ({
   zoom: 'fit',
   clipboard: null,
   focusTextId: null,
+  inspectorSplit: loadSplit(),
+  setInspectorSplit: (v) => {
+    const inspectorSplit = clampSplit(v);
+    set({ inspectorSplit });
+    try {
+      localStorage.setItem(SPLIT_KEY, String(inspectorSplit));
+    } catch {
+      // Storage unavailable (private mode etc.); keep the in-memory value.
+    }
+  },
   setFocusText: (focusTextId) => set({ focusTextId }),
   selectInstance: (id) =>
     set((s) => ({
